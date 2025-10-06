@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Quiz vocabulaire</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <h1>Quiz vocabulaire</h1>
+
+    <div class="quiz-card">
+        <div class="quiz-meta">
+            <span id="progress">0 / 0</span>
+            <span>•</span>
+            <span id="score">Score : 0</span>
+        </div>
+
+        <div class="quiz-question">
+            <div class="label">Traduction :</div>
+            <div id="prompt" class="prompt">—</div>
+        </div>
+
+        <form id="quiz-form" class="quiz-form">
+            <label for="answer">Original</label>
+            <input id="answer" name="answer" type="text" autocomplete="off" required placeholder="Tape ta réponse…" />
+            <div class="quiz-actions">
+                <button id="validateBtn" type="submit">Valider</button>
+                <button id="nextBtn" type="button" disabled>Suivant</button>
+                <button id="revealBtn" type="button">Révéler</button>
+            </div>
+        </form>
+
+        <div id="feedback" class="feedback"></div>
+    </div>
+
+    <p><a href="/">Retour</a></p>
+
+    <script src="/quiz.js"></script>
+</body>
+
+</html>

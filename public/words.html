@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Liste des mots (SPA-like)</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <h1>Liste des mots</h1>
+
+    <form id="form-add" class="form-add">
+        <label>
+            mot
+            <input type="text" name="mot" id="mot" required />
+        </label>
+        <label>
+            traduction
+            <input type="text" name="traduction" id="traduction" required />
+        </label>
+        <button type="submit">Ajouter</button>
+        <span id="msg" class="msg" aria-live="polite"></span>
+    </form>
+
+    <table>
+        <thead id="thead-words"></thead>
+        <tbody id="tbody-words">
+            <!-- lignes injectées par app.js -->
+        </tbody>
+    </table>
+
+    <p><a href="/">Retour</a></p>
+
+    <script src="/app.js"></script>
+</body>
+
+</html>
