@@ -3,14 +3,14 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Liste des mots (SPA-like)</title>
+    <title>Liste des mots</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
     <h1>Liste des mots</h1>
 
-    <form id="form-add" class="form-add">
+    <form id="form-add" class="form-add" aria-describedby="msg">
         <label>
             mot
             <input type="text" name="mot" id="mot" required />
@@ -19,19 +19,27 @@
             traduction
             <input type="text" name="traduction" id="traduction" required />
         </label>
+        <label>
+            id leçon
+            <input type="number" name="lessonId" id="lessonId" min="1" step="1" value="1" required />
+        </label>
         <button type="submit">Ajouter</button>
         <span id="msg" class="msg" aria-live="polite"></span>
     </form>
 
     <table>
-        <thead id="thead-words"></thead>
+        <thead>
+            <tr>
+                <th>Original</th>
+                <th>Traduction</th>
+            </tr>
+        </thead>
         <tbody id="tbody-words">
             <!-- lignes injectées par app.js -->
         </tbody>
     </table>
 
     <p><a href="/">Retour</a></p>
-
     <script src="/app.js"></script>
 </body>
 

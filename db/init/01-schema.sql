@@ -1,3 +1,21 @@
+-- ===========================================================
+-- POWER SHELL COMMAND
+-- ===========================================================
+-- check if mariadb in installed
+-- winget list | Where-Object { $_ -match 'MariaDB|MySQL' }
+--
+-- Search paquet name
+-- winget search mariadb
+-- 
+-- Install Mariadb
+-- winget install --id MariaDB.Server -e
+--
+-- Check version
+-- mariadb --version
+--
+-- Update Mariadb
+-- winget upgrade MariaDB.Server
+
 CREATE DATABASE IF NOT EXISTS voc_db CHARACTER
 SET
     utf8mb4 COLLATE utf8mb4_unicode_ci;
