@@ -1,33 +1,43 @@
 // server.js
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const mysql = require('mysql2/promise');
-require('dotenv').config();
 
+// --- Modules Node standard ---
+const http = require('http');          // serveur HTTP "vanilla"
+const fs = require('fs');              // lecture de fichiers (statique)
+const path = require('path');          // chemins de fichiers/dossiers
+
+// --- Dépendances ---
+const mysql = require('mysql2/promise'); // client MariaDB/MySQL en mode Promises
+require('dotenv').config();              // charge les variables d'env depuis .env
+
+// --- Configuration de base ---
 const PORT = Number(process.env.PORT || 3000);
 
-// Pool MySQL/MariaDB
+// --- Pool de connexions MariaDB/MySQL ---
+// Utiliser un pool évite d'ouvrir une connexion par requête HTTP et gère la file d'attente.
+// Les valeurs viennent du .env (ne pas le committer).
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
+    waitForConnections: true, // met en attente au lieu de jeter une erreur si le pool est plein
+    connectionLimit: 10,      // nombre max de connexions simultanées
 });
 
+// --- Dossier qui contient les fichiers statiques (front) ---
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// Helper: envoi de réponse HTTP avec quelques en-têtes basiques de sécurité
 function send(res, status, type, body) {
     res.writeHead(status, {
         'Content-Type': type + '; charset=utf-8',
-        'X-Content-Type-Options': 'nosniff'
+        'X-Content-Type-Options': 'nosniff',
     });
     res.end(body);
 }
 
+// Helper: servir un fichier statique depuis /public
 function serveStatic(res, relPath, type) {
     const filePath = path.join(PUBLIC_DIR, relPath);
     fs.readFile(filePath, (err, data) => {
@@ -36,53 +46,80 @@ function serveStatic(res, relPath, type) {
     });
 }
 
+// --- Serveur HTTP principal ---
+// On gère ici à la main :
+//   - les routes de fichiers statiques
+//   - les alias pratiques (redirections "words" -> "words.html", etc.)
+//   - l'API JSON minimale /api/words (GET/POST)
 const server = http.createServer(async (req, res) => {
     try {
-        // ------- FICHIERS STATIQUES -------
+        // ====== FICHIERS STATIQUES ======
         if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html'))
             return serveStatic(res, 'index.html', 'text/html');
+
         if (req.method === 'GET' && req.url === '/style.css')
             return serveStatic(res, 'style.css', 'text/css');
+
         if (req.method === 'GET' && req.url === '/words.html')
             return serveStatic(res, 'words.html', 'text/html');
+
         if (req.method === 'GET' && req.url === '/app.js')
             return serveStatic(res, 'app.js', 'application/javascript');
 
-        // Aliases pratiques
+        // Aliases pratiques (redirections 302)
         if (req.method === 'GET' && req.url === '/words') {
             res.writeHead(302, { Location: '/words.html' });
             return res.end();
         }
+        
         if (req.method === 'GET' && req.url === '/quiz') {
             res.writeHead(302, { Location: '/quiz.html' });
             return res.end();
         }
+
         if (req.method === 'GET' && req.url === '/quiz.html')
             return serveStatic(res, 'quiz.html', 'text/html');
+
         if (req.method === 'GET' && req.url === '/quiz.js')
             return serveStatic(res, 'quiz.js', 'application/javascript');
 
-        // ------- API JSON -------
+        // ====== API JSON ======
+
+        // GET /api/words
+        // - Récupère tous les mots
+        // - On renvoie des alias stables { original, translation } pour simplifier le front
         if (req.method === 'GET' && req.url === '/api/words') {
             const [rows] = await pool.query(`
                 SELECT word_original AS original, word_translation AS translation
                 FROM word
                 ORDER BY id_word ASC
             `);
-
             return send(res, 200, 'application/json', JSON.stringify(rows));
         }
 
+        // POST /api/words
+        // - Ajoute un mot {mot, traduction, lessonId}
+        // - Content-Type attendu: application/json
+        // - fk_lesson est NOT NULL côté BDD, on met par défaut 1 si non fourni
         if (req.method === 'POST' && req.url === '/api/words') {
             const ct = req.headers['content-type'] || '';
             if (!ct.includes('application/json')) {
-                return send(res, 415, 'application/json', JSON.stringify({ error: 'Content-Type application/json requis' }));
+                // 415 = Unsupported Media Type
+                return send(
+                    res,
+                    415,
+                    'application/json',
+                    JSON.stringify({ error: 'Content-Type application/json requis' })
+                );
             }
+
+            // Lecture du body (limité à ~1 Mo pour éviter abus/déni de service)
             let raw = '';
-            req.on('data', chunk => {
+            req.on('data', (chunk) => {
                 raw += chunk;
-                if (raw.length > 1e6) req.socket.destroy(); // 1MB max
+                if (raw.length > 1e6) req.socket.destroy(); // coupe si body trop gros
             });
+
             req.on('end', async () => {
                 try {
                     const data = JSON.parse(raw || '{}');
@@ -90,31 +127,44 @@ const server = http.createServer(async (req, res) => {
                     const traduction = (data.traduction || '').trim();
                     const lessonId = Number(data.lessonId) || 1; // valeur par défaut 1
 
+                    // Validation minimale
                     if (!mot || !traduction) {
-                        return send(res, 400, 'application/json', JSON.stringify({ error: 'Champs requis: mot, traduction' }));
+                        return send(
+                            res,
+                            400,
+                            'application/json',
+                            JSON.stringify({ error: 'Champs requis: mot, traduction' })
+                        );
                     }
 
+                    // Requête paramétrée (évite les injections SQL)
                     await pool.execute(
                         'INSERT INTO word (word_original, word_translation, fk_lesson) VALUES (?, ?, ?)',
                         [mot, traduction, lessonId]
                     );
+
                     return send(res, 201, 'application/json', JSON.stringify({ success: true }));
                 } catch (e) {
+                    // Erreur JSON invalide / BDD / autre
                     console.error('[POST /api/words] error:', e);
                     return send(res, 500, 'application/json', JSON.stringify({ error: 'Erreur serveur' }));
                 }
             });
+
+            // Important : retourner ici pour ne pas continuer le flux (la réponse part dans 'end')
             return;
         }
 
-        // 404
+        // Si aucune route ne correspond -> 404
         send(res, 404, 'text/plain', 'Page non trouvée');
     } catch (err) {
+        // Filet de sécurité (erreur non rattrapée)
         console.error('[SERVER] Uncaught error:', err);
         send(res, 500, 'text/plain', 'Erreur serveur (voir la console)');
     }
 });
 
+// Démarrage du serveur HTTP
 server.listen(PORT, () => {
     console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });
